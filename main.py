@@ -26,10 +26,11 @@ def handle_start(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == 'new_game')
 def new_game(call):
-    global game_is_ongoing, start, shot_number, game_id, boxscore
+    global game_is_ongoing, start, shot_number, game_id, boxscore, maxim_score, dima_score
     game_is_ongoing = 1
     start = datetime.now()
     shot_number = 0
+    maxim_score, dima_score = 0, 0
     boxscore = {'game_id': [], 'shot_number': [], 'timestamp': [], 'player': [],
                 'shot_type': [], 'shot_moose': [], 'shot_help': [], 'shot_score': []}
     game_id = str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
