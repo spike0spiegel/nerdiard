@@ -1,5 +1,6 @@
 import telebot
-import uuid
+import csv
+from io import StringIO
 from datetime import datetime
 from telebot import types
 
@@ -25,11 +26,13 @@ def handle_start(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == 'new_game')
 def new_game(call):
-    global game_is_ongoing, start, shot_number, game_id
+    global game_is_ongoing, start, shot_number, game_id, boxscore
     game_is_ongoing = 1
     start = datetime.now()
     shot_number = 0
-    game_id = str(uuid.uuid4())
+    boxscore = {'game_id': [], 'shot_number': [], 'timestamp': [], 'player': [],
+                'shot_type': [], 'shot_moose': [], 'shot_help': [], 'shot_score': []}
+    game_id = str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     markup = types.InlineKeyboardMarkup(row_width=2)
     button_1 = types.InlineKeyboardButton('Максим', callback_data='Максим')
     button_2 = types.InlineKeyboardButton('Дима', callback_data='Дима')
@@ -47,28 +50,16 @@ def configure_shot(call):
     button_svoi = types.InlineKeyboardButton('Свой', callback_data='Свой')
     button_chuzhoi = types.InlineKeyboardButton('Чужой', callback_data='Чужой')
     button_otigrish = types.InlineKeyboardButton('Отыгрыш', callback_data='Отыгрыш')
-    if call.data in ['Свой', 'Чужой', 'Отыгрыш']:
-        global shot_type
-        shot_type = '1'
 
     button_moose_yes = types.InlineKeyboardButton('Лось', callback_data='Лось')
     button_moose_no = types.InlineKeyboardButton('Без лося', callback_data='Без лося')
-    if call.data in ['Лось', 'Без лося']:
-        global shot_moose
-        shot_moose = call.data
 
     button_help_yes = types.InlineKeyboardButton('Подставил', callback_data='Подставил')
     button_help_no =  types.InlineKeyboardButton('Не подставил', callback_data='Не подставил')
-    if call.data in ['Подставил', 'Не подставил']:
-        global shot_help
-        shot_help = call.data
 
     button_score_0 = types.InlineKeyboardButton('0', callback_data='0')
     button_score_1 = types.InlineKeyboardButton('1', callback_data='1')
     button_score_2 = types.InlineKeyboardButton('2', callback_data='2')
-    if call.data in ['0', '1', '2']:
-        global shot_score
-        shot_score = call.data
 
     shot_data.add(button_svoi, button_chuzhoi, button_otigrish)
     shot_data.add(button_moose_yes, button_moose_no)
@@ -92,9 +83,10 @@ def shot_help(call):
     global shot_help
     shot_help = call.data
 
+
 @bot.callback_query_handler(func=lambda call: call.data in ['0', '1', '2'])
 def shot_score(call):
-    global shot_score, player, dima_score,maxim_score, start, end, game_is_ongoing, shot_number, game_id
+    global shot_score, player, dima_score, maxim_score, start, end, game_is_ongoing, shot_number, game_id, boxscore
     shot_score = call.data
 
     shot_number += 1
@@ -105,7 +97,6 @@ def shot_score(call):
         dima_score += int(shot_score)
 
     bot.send_message(call.message.chat.id, f'Удар был записан. Максим {maxim_score} - {dima_score} Дима.')
-    #bot.send_message(call.message.chat.id, f'{game_id}, {str(shot_number)}, {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     if shot_score == '0':
         if player == 'Максим':
             player = 'Дима'
@@ -113,6 +104,20 @@ def shot_score(call):
             player = 'Максим'
 
     call.data = player
+
+    shot_type_cipher = {'Свой': 0, 'Чужой': 1, 'Отыгрыш': 2}
+    shot_moose_cipher = {'Лось': 1, 'Без лося': 0}
+    shot_help_cipher = {'Подставил': 1, 'Не подставил': 0}
+
+    boxscore['game_id'].append(game_id)
+    boxscore['shot_number'].append(shot_number)
+    boxscore['player'].append(player)
+    boxscore['timestamp'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    boxscore['shot_type'].append(shot_type_cipher[shot_type])
+    boxscore['shot_moose'].append(shot_moose_cipher[shot_moose])
+    boxscore['shot_help'].append(shot_help_cipher[shot_help])
+    boxscore['shot_score'].append(shot_score)
+
     if not (maxim_score >= 8 or dima_score >= 8):
         configure_shot(call)
     else:
@@ -122,12 +127,25 @@ def shot_score(call):
         minutes = time_difference.total_seconds() // 60
         seconds = time_difference.total_seconds() % 60
 
-
-
-        bot.send_message(call.message.chat.id, f'Партия завершена за {str(minutes).split(".")[0]}:{str(seconds).split(".")[0]}'
-                                               f' со счётом'
+        bot.send_message(call.message.chat.id, f'Партия завершена за {str(minutes).split(".")[0]}:'
+                                               f'{str(seconds).split(".")[0]} со счётом'
                                                f' Максим - {maxim_score}, Дима - {dima_score}.')
         game_is_ongoing = 0
+
+        csv_data = StringIO()
+        csv_writer = csv.writer(csv_data)
+
+        # Write the header
+        csv_writer.writerow(boxscore.keys())
+
+        for row in zip(*boxscore.values()):
+            csv_writer.writerow(row)
+
+        csv_data.seek(0)
+
+        bot.send_document(call.message.chat.id, csv_data)
+
         new_game(call)
+
 
 bot.polling(none_stop=True)
