@@ -1,10 +1,17 @@
 import telebot
+import uuid
+from datetime import datetime
 from telebot import types
 
-
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
-player, shot_type, shot_moose, shot_help, shot_score = '', '', '', '', ''
+player, shot_type, shot_moose, shot_help, shot_score, start, end = '', '', '', '', '', datetime, datetime
 game_is_ongoing = 0
+game_id = ''
+maxim_score = 0
+dima_score = 0
+shot_number = 0
+boxscore = {}
+
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
@@ -18,8 +25,11 @@ def handle_start(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == 'new_game')
 def new_game(call):
-    global game_is_ongoing
+    global game_is_ongoing, start, shot_number, game_id
     game_is_ongoing = 1
+    start = datetime.now()
+    shot_number = 0
+    game_id = str(uuid.uuid4())
     markup = types.InlineKeyboardMarkup(row_width=2)
     button_1 = types.InlineKeyboardButton('Максим', callback_data='Максим')
     button_2 = types.InlineKeyboardButton('Дима', callback_data='Дима')
@@ -84,10 +94,18 @@ def shot_help(call):
 
 @bot.callback_query_handler(func=lambda call: call.data in ['0', '1', '2'])
 def shot_score(call):
-    global shot_score, player
+    global shot_score, player, dima_score,maxim_score, start, end, game_is_ongoing, shot_number, game_id
     shot_score = call.data
 
-    bot.send_message(call.message.chat.id, f'Удар был записан.')
+    shot_number += 1
+
+    if player == 'Максим':
+        maxim_score += int(shot_score)
+    else:
+        dima_score += int(shot_score)
+
+    bot.send_message(call.message.chat.id, f'Удар был записан. Максим {maxim_score} - {dima_score} Дима.')
+    #bot.send_message(call.message.chat.id, f'{game_id}, {str(shot_number)}, {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     if shot_score == '0':
         if player == 'Максим':
             player = 'Дима'
@@ -95,6 +113,21 @@ def shot_score(call):
             player = 'Максим'
 
     call.data = player
-    configure_shot(call)
+    if not (maxim_score >= 8 or dima_score >= 8):
+        configure_shot(call)
+    else:
+        end = datetime.now()
+
+        time_difference = end - start
+        minutes = time_difference.total_seconds() // 60
+        seconds = time_difference.total_seconds() % 60
+
+
+
+        bot.send_message(call.message.chat.id, f'Партия завершена за {str(minutes).split(".")[0]}:{str(seconds).split(".")[0]}'
+                                               f' со счётом'
+                                               f' Максим - {maxim_score}, Дима - {dima_score}.')
+        game_is_ongoing = 0
+        new_game(call)
 
 bot.polling(none_stop=True)
