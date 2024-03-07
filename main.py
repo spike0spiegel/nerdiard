@@ -122,21 +122,22 @@ def shot(call):
 
         new_game(call)
 
-@bot.message_handler(commands=['ctrlz'])
-def handle_ctrlz(message):
-    global boxscore, shot_number, shot_score, andrey_score, dima_score
-    boxscore['game_id'] = boxscore['game_id'][:-1]
-    boxscore['shot_number'] = boxscore['shot_number'][:-1]
-    boxscore['player'] = boxscore['player'][:-1]
-    boxscore['timestamp'] = boxscore['timestamp'][:-1]
-    boxscore['shot_type'] = boxscore['shot_type'][:-1]
-    boxscore['shot_score'] = boxscore['shot_score'][:-1]
-    shot_number -= 1
-    if shot_score == '1':
-        if player == 'Андрей':
-            andrey_score -= 1
-        elif player == 'Дима':
-            dima_score -= 1
-    bot.send_message(message.chat.id, f'Последний удар отменён, счёт остается прежним: {andrey_score} - {dima_score}')
+# @bot.message_handler(commands=['ctrlz'])
+# def handle_ctrlz(message):
+#     global boxscore, shot_number, shot_score, andrey_score, dima_score
+#     boxscore['game_id'] = boxscore['game_id'][:-1]
+#     boxscore['shot_number'] = boxscore['shot_number'][:-1]
+#     boxscore['player'] = boxscore['player'][:-1]
+#     boxscore['timestamp'] = boxscore['timestamp'][:-1]
+#     boxscore['shot_type'] = boxscore['shot_type'][:-1]
+#     boxscore['shot_score'] = boxscore['shot_score'][:-1]
+#     shot_number -= 1
+#     if shot_score == '1':
+#         if player == 'Андрей':
+#             andrey_score -= 1
+#         elif player == 'Дима':
+#             dima_score -= 1
+#     bot.send_message(message.chat.id, f'Последний удар отменён, счёт остается прежним: {andrey_score} - {dima_score}')
+
 
 bot.polling(none_stop=True)
