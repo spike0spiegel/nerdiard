@@ -24,6 +24,7 @@ def handle_start(message):
                      reply_markup=markup)
 
 
+
 @bot.callback_query_handler(func=lambda call: call.data == 'new_game')
 def new_game(call):
     global game_is_ongoing, start, shot_number, game_id, boxscore, andrey_score, dima_score
@@ -52,9 +53,9 @@ def configure_shot(call):
     button_ch1 = types.InlineKeyboardButton('Ч1', callback_data='Ч1')
     button_ch2 = types.InlineKeyboardButton('Ч2', callback_data='Ч2')
 
-    button_s0 = types.InlineKeyboardButton('C0', callback_data='C0')
-    button_s1 = types.InlineKeyboardButton('C1', callback_data='C1')
-    button_s2 = types.InlineKeyboardButton('C2', callback_data='C2')
+    button_s0 = types.InlineKeyboardButton('C0', callback_data='С0')
+    button_s1 = types.InlineKeyboardButton('C1', callback_data='С1')
+    button_s2 = types.InlineKeyboardButton('C2', callback_data='С2')
 
     shot_data.add(button_ch0, button_ch1, button_ch2)
     shot_data.add(button_s0, button_s1, button_s2)
@@ -76,7 +77,7 @@ def shot(call):
         dima_score += int(shot_score)
 
     bot.send_message(call.message.chat.id, f'Удар был записан. Андрей {andrey_score} - {dima_score} Дима.')
-    if shot_score == 0:
+    if shot_score == '0':
         if player == 'Андрей':
             player = 'Дима'
         else:
@@ -121,5 +122,21 @@ def shot(call):
 
         new_game(call)
 
+@bot.message_handler(commands=['ctrlz'])
+def handle_ctrlz(message):
+    global boxscore, shot_number, shot_score, andrey_score, dima_score
+    boxscore['game_id'] = boxscore['game_id'][:-1]
+    boxscore['shot_number'] = boxscore['shot_number'][:-1]
+    boxscore['player'] = boxscore['player'][:-1]
+    boxscore['timestamp'] = boxscore['timestamp'][:-1]
+    boxscore['shot_type'] = boxscore['shot_type'][:-1]
+    boxscore['shot_score'] = boxscore['shot_score'][:-1]
+    shot_number -= 1
+    if shot_score == '1':
+        if player == 'Андрей':
+            andrey_score -= 1
+        elif player == 'Дима':
+            dima_score -= 1
+    bot.send_message(message.chat.id, f'Последний удар отменён, счёт остается прежним: {andrey_score} - {dima_score}')
 
 bot.polling(none_stop=True)
