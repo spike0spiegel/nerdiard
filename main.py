@@ -61,10 +61,11 @@ def configure_shot(call):
 
     bot.send_message(call.message.chat.id, f'Введите удар игрока {player}', reply_markup=shot_data)
 
-@bot.callback_query_handler(func=lambda call: call.data in ['Ч0', 'Ч1', 'Ч2', 'С0', 'С1','С2'])
+
+@bot.callback_query_handler(func=lambda call: call.data in ['Ч0', 'Ч1', 'Ч2', 'С0', 'С1', 'С2'])
 def shot(call):
-    global shot_type, shot_score, player, andrey_score, dima_score, shot_number
-    shot_type = int(call.data[1])
+    global shot_type, shot_score, player, andrey_score, dima_score, shot_number, start, end, game_is_ongoing
+    shot_type = int(call.data[0])
     shot_score = int(call.data[1])
 
     shot_number += 1
