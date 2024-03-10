@@ -157,11 +157,19 @@ def register_shot(call):
 
         bot.send_message(call.message.chat.id, f"Партия завершена за {minutes}:"
                                                f"{seconds} со счётом"
-                                               f" {game_state['player_1_first_name']} - {game_state['player_1_score']},"
-                                               f" {game_state['player_2_first_name']} - {game_state['player_2_score']}.")
-        player_1_accuracy =
+                                               f" {game_state['player_1_first_name']} - {game_state['player_1_score']}:"
+                                               f" {game_state['player_2_score']} - {game_state['player_2_first_name']}.")
+
+        player_1_count = game_state['game_data']['player_id'].count(game_state['player_1_id'])
+        player_2_count = game_state['game_data']['player_id'].count(game_state['player_2_id'])
+
+        player_1_accuracy = str(100 * game_state['player_1_score'] / player_1_count) + '%'
+
+        player_2_accuracy = str(100 * game_state['player_2_score'] / player_1_count) + '%'
+
         bot.send_message(call.message.chat.id, f" Количество ударов - {game_state['shots']}."
-                                                    f" Точность ")
+                                                    f" Точность {game_state['player_1_first_name']} - {player_1_accuracy}"
+                                                    f" Точность {game_state['player_2_first_name']} - {player_2_accuracy}")
 
 
 # @bot.message_handler(commands=['cancelshot'])
