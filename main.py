@@ -1,15 +1,12 @@
 import telebot
-import csv
-from io import StringIO
 from datetime import datetime
 from telebot import types
-import os
 import pandas as pd
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
-players_csv = "D:\Projects\nerdiard\players.csv" #список всех пользователей бота
+players_csv = 'D:/Projects/nerdiard/players.csv' #список всех пользователей бота
 live_players = [] #список играющих в данных момент пользователей
-data = "D:\Projects\nerdiard\data.csv" #данные
+data = 'D:/Projects/nerdiard/data.csv' #данные
 active_games = {}
 
 
@@ -44,59 +41,47 @@ def handle_start(message):
 
 @bot.message_handler(func=lambda message: message.forward_from is not None) #старт партии и выбор игроков
 def choose_opponent(message):
-    global players_csv, live_players
+    global players_csv, live_players, active_games
     player_1_id = message.from_user.id
     player_2_id = message.forward_from.id
     players = pd.read_csv(players_csv)
     if player_2_id in live_players:
         bot.reply_to(message, 'Ваш оппонент уже в игре.')
         return
-    if not players['id'].isin(player_1_id).any(): #добавление игроков в базу данных
-        players.append({'id': player_1_id, 'first_name': message.from_user.first_name,
+    if not player_1_id in players['id'].unique(): #добавление игроков в базу данных
+        players._append({'id': player_1_id, 'first_name': message.from_user.first_name,
                         'username': message.from_user.username}, ignore_index=True)
-    if not players['id'].isin(player_2_id).any():  # добавление игроков в базу данных
-        players.append({'id': player_2_id, 'first_name': message.forward_from.first_name,
+    if not player_2_id in players['id'].unique():  # добавление игроков в базу данных
+        players._append({'id': player_2_id, 'first_name': message.forward_from.first_name,
                         'username': message.forward_from.username}, ignore_index=True)
+
+    players.to_csv(players_csv, index=False)
 
     markup = types.InlineKeyboardMarkup()
 
-    player_1_first_name = next((player['name'] for player in players if player['id'] == player_1_id), None)
-    player_2_first_name = next((player['name'] for player in players if player['id'] == player_2_id), None)
+    player_1_first_name = message.from_user.first_name
+    player_2_first_name = message.forward_from.first_name
 
     button_1 = types.InlineKeyboardButton(f'{player_1_first_name}', callback_data='player_1_shot')
     button_2 = types.InlineKeyboardButton(f'{player_2_first_name}', callback_data='player_2_shot')
     markup.add(button_1, button_2)
     bot.send_message(message.chat.id, f'Партия начинается, кто разбивает?', reply_markup=markup)
     live_players.append([player_1_id, player_2_id])
-    game_id = f'{player_1_id}-{player_2_id}-{datetime.now().date()}'
+    game_id = f'{player_1_id}-{datetime.now().date()}'
     active_games[game_id] = {'player_1_id': player_1_id, 'player_2_id': player_2_id,
                              'player_1_first_name': player_1_first_name, 'player_2_first_name': player_2_first_name,
                              'player_1_score': 0, 'player_2_score': 0,
                              'start_time': datetime.now().strftime('%H:%M:%S'),
-                             'shots': 0}
+                             'shots': 0,
+                             'game_data': {'game_id': [], 'player_id': [], 'timestamp': [], 'shot_type': [],
+                                           'shot_score': []},
+                             'shooter': ''}
 
 @bot.callback_query_handler(func=lambda call: call.data in ['player_1_shot', 'player_2_shot'])
-def register_shot(call):
-    game_id = f'{call.from_user.id}-{call.message.forward_from.id}-{datetime.now().date()}'
-    game_state = active_games.get(game_id)
-    game_is_ongoing = 1
-    start = datetime.now()
-    shot_number = 0
-    andrey_score, dima_score = 0, 0
-    boxscore = {'game_id': [], 'shot_number': [], 'timestamp': [], 'player': [],
-                'shot_type': [], 'shot_score': []}
-    game_id = str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    button_1 = types.InlineKeyboardButton('Андрей', callback_data='Андрей')
-    button_2 = types.InlineKeyboardButton('Дима', callback_data='Дима')
-    markup.add(button_1, button_2)
-    bot.send_message(call.message.chat.id, 'Кто разбивает?', reply_markup=markup)
-
-
-@bot.callback_query_handler(func=lambda call: call.data == 'show_shot')
-def configure_shot(call):
-    global player
-    player = call.data
+def make_shot(call):
+    global active_games
+    game_id = f'{call.from_user.id}-{datetime.now().date()}'
+    game_state = active_games[game_id]
 
     shot_data = types.InlineKeyboardMarkup()
 
@@ -111,66 +96,61 @@ def configure_shot(call):
     shot_data.add(button_ch0, button_ch1, button_ch2)
     shot_data.add(button_s0, button_s1, button_s2)
 
-    bot.send_message(call.message.chat.id, f'Введите удар игрока {player}', reply_markup=shot_data)
+    if call.data == 'player_1_shot':
+        shooter = game_state['player_1_first_name']
+        game_state['shooter'] = 1
+    else:
+        shooter = game_state['player_2_first_name']
+        game_state['shooter'] = 2
+
+    bot.send_message(call.message.chat.id, f'Введите удар игрока {shooter}', reply_markup=shot_data)
 
 
 @bot.callback_query_handler(func=lambda call: call.data in ['Ч0', 'Ч1', 'Ч2', 'С0', 'С1', 'С2'])
-def shot(call):
-    global shot_type, shot_score, player, andrey_score, dima_score, shot_number, start, end, game_is_ongoing
+def register_shot(call):
+    global active_games
+    game_id = f'{call.from_user.id}-{datetime.now().date()}'
+    game_state = active_games[game_id]
+    game_state['shots'] += 1
     shot_type = call.data[0]
     shot_score = call.data[1]
 
-    shot_number += 1
-    if player == 'Андрей':
-        andrey_score += int(shot_score)
+    if game_state['shooter'] == 1:
+        game_state['player_1_score'] += int(shot_score)
     else:
-        dima_score += int(shot_score)
+        game_state['player_2_score'] += int(shot_score)
 
-    bot.send_message(call.message.chat.id, f'Удар был записан. Андрей {andrey_score} - {dima_score} Дима.')
+
+    bot.send_message(call.message.chat.id, f"Удар был записан. {game_state['player_1_first_name']} "
+                                           f"{game_state['player_1_score']} - {game_state['player_2_score']} "
+                                           f"{game_state['player_2_first_name']}.")
     if shot_score == '0':
-        if player == 'Андрей':
-            player = 'Дима'
+        if game_state['shooter'] == 1:
+            game_state['shooter'] = 2
         else:
-            player = 'Андрей'
+            game_state['shooter'] = 1
 
-    call.data = player
+    game_state['game_data']['game_id'].append(game_id)
+    game_state['game_data']['player_id'].append(game_state['player_1_id'])
+    #game_state['game_data']['timestamp'].append[datetime.now().strftime("%H:%M:%S")]
+    game_state['game_data']['shot_type'].append[shot_type]
+    game_state['game_data']['shot_score'].append[shot_score]
 
-    boxscore['game_id'].append(game_id)
-    boxscore['shot_number'].append(shot_number)
-    boxscore['player'].append(player)
-    boxscore['timestamp'].append(datetime.now().strftime("%H:%M:%S"))
-    boxscore['shot_type'].append(shot_type)
-    boxscore['shot_score'].append(shot_score)
-
-    if not (andrey_score >= 8 or dima_score >= 8):
-        configure_shot(call)
+    if not game_state['player_1_score'] >= 8 or game_state['player_2_score'] >= 8:
+        make_shot(call)
     else:
-        end = datetime.now()
+        game_state['end_time'] = datetime.now().strftime('%H:%M:%S')
 
-        time_difference = end - start
+        time_difference = game_state['end_time'] - game_state['start_time']
         minutes = time_difference.total_seconds() // 60
         seconds = time_difference.total_seconds() % 60
 
-        bot.send_message(call.message.chat.id, f'Партия завершена за {str(minutes).split(".")[0]}:'
-                                               f'{str(seconds).split(".")[0]} со счётом'
-                                               f' Максим - {andrey_score}, Дима - {dima_score}.'
-                                               f' Количество ударов - {shot_number}.')
-        game_is_ongoing = 0
+        bot.send_message(call.message.chat.id, f"Партия завершена за {str(minutes).split('')[0]}:"
+                                               f"{str(seconds).split('')[0]} со счётом"
+                                               f" {game_state['player_1_first_name']} - {game_state['player_1_score']},"
+                                               f" {game_state['player_2_first_name']} - {game_state['player_2_score']}."
+                                               f" Количество ударов - {game_state['shots']}.")
 
-        csv_data = StringIO()
-        csv_writer = csv.writer(csv_data)
-
-        # Write the header
-        csv_writer.writerow(boxscore.keys())
-
-        for row in zip(*boxscore.values()):
-            csv_writer.writerow(row)
-
-        csv_data.seek(0)
-
-        bot.send_document(call.message.chat.id, csv_data)
-
-        new_game(call)
 
 # @bot.message_handler(commands=['ctrlz'])
 # def handle_ctrlz(message):
