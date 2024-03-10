@@ -71,7 +71,7 @@ def choose_opponent(message):
     active_games[game_id] = {'player_1_id': player_1_id, 'player_2_id': player_2_id,
                              'player_1_first_name': player_1_first_name, 'player_2_first_name': player_2_first_name,
                              'player_1_score': 0, 'player_2_score': 0,
-                             'start_time': datetime.now().strftime('%H:%M:%S'),
+                             'start_time': datetime.now(),
                              'shots': 0,
                              'game_data': {'game_id': [], 'player_id': [], 'timestamp': [], 'shot_type': [],
                                            'shot_score': []},
@@ -82,6 +82,13 @@ def make_shot(call):
     global active_games
     game_id = f'{call.from_user.id}-{datetime.now().date()}'
     game_state = active_games[game_id]
+
+    if call.data == 'player_1_shot':
+        shooter_name = game_state['player_1_first_name']
+        game_state['shooter'] = 1
+    elif call.data == 'player_2_shot':
+        shooter_name = game_state['player_2_first_name']
+        game_state['shooter'] = 2
 
     shot_data = types.InlineKeyboardMarkup()
 
@@ -96,14 +103,12 @@ def make_shot(call):
     shot_data.add(button_ch0, button_ch1, button_ch2)
     shot_data.add(button_s0, button_s1, button_s2)
 
-    if call.data == 'player_1_shot':
-        shooter = game_state['player_1_first_name']
-        game_state['shooter'] = 1
-    else:
-        shooter = game_state['player_2_first_name']
-        game_state['shooter'] = 2
+    if game_state['shooter'] == 1:
+        shooter_name = game_state['player_1_first_name']
+    elif game_state['shooter'] == 2:
+        shooter_name = game_state['player_2_first_name']
 
-    bot.send_message(call.message.chat.id, f'Введите удар игрока {shooter}', reply_markup=shot_data)
+    bot.send_message(call.message.chat.id, f'Введите удар игрока {shooter_name}', reply_markup=shot_data)
 
 
 @bot.callback_query_handler(func=lambda call: call.data in ['Ч0', 'Ч1', 'Ч2', 'С0', 'С1', 'С2'])
@@ -124,35 +129,42 @@ def register_shot(call):
     bot.send_message(call.message.chat.id, f"Удар был записан. {game_state['player_1_first_name']} "
                                            f"{game_state['player_1_score']} - {game_state['player_2_score']} "
                                            f"{game_state['player_2_first_name']}.")
+
+    game_state['game_data']['game_id'].append(game_id)
+    if game_state['shooter'] == 1:
+        game_state['game_data']['player_id'].append(game_state['player_1_id'])
+    elif game_state['shooter'] == 2:
+        game_state['game_data']['player_id'].append(game_state['player_2_id'])
+    game_state['game_data']['timestamp'].append(datetime.now().strftime("%H:%M:%S"))
+    game_state['game_data']['shot_type'].append(shot_type)
+    game_state['game_data']['shot_score'].append(shot_score)
+
     if shot_score == '0':
         if game_state['shooter'] == 1:
             game_state['shooter'] = 2
         else:
             game_state['shooter'] = 1
 
-    game_state['game_data']['game_id'].append(game_id)
-    game_state['game_data']['player_id'].append(game_state['player_1_id'])
-    #game_state['game_data']['timestamp'].append[datetime.now().strftime("%H:%M:%S")]
-    game_state['game_data']['shot_type'].append[shot_type]
-    game_state['game_data']['shot_score'].append[shot_score]
 
-    if not game_state['player_1_score'] >= 8 or game_state['player_2_score'] >= 8:
+    if not (game_state['player_1_score'] >= 8 or game_state['player_2_score'] >= 8):
         make_shot(call)
     else:
-        game_state['end_time'] = datetime.now().strftime('%H:%M:%S')
+        game_state['end_time'] = datetime.now()
 
         time_difference = game_state['end_time'] - game_state['start_time']
-        minutes = time_difference.total_seconds() // 60
-        seconds = time_difference.total_seconds() % 60
+        minutes = str(time_difference.total_seconds() // 60).split('.')[0]
+        seconds = str(time_difference.total_seconds() % 60).split('.')[0]
 
-        bot.send_message(call.message.chat.id, f"Партия завершена за {str(minutes).split('')[0]}:"
-                                               f"{str(seconds).split('')[0]} со счётом"
+        bot.send_message(call.message.chat.id, f"Партия завершена за {minutes}:"
+                                               f"{seconds} со счётом"
                                                f" {game_state['player_1_first_name']} - {game_state['player_1_score']},"
-                                               f" {game_state['player_2_first_name']} - {game_state['player_2_score']}."
-                                               f" Количество ударов - {game_state['shots']}.")
+                                               f" {game_state['player_2_first_name']} - {game_state['player_2_score']}.")
+        player_1_accuracy =
+        bot.send_message(call.message.chat.id, f" Количество ударов - {game_state['shots']}."
+                                                    f" Точность ")
 
 
-# @bot.message_handler(commands=['ctrlz'])
+# @bot.message_handler(commands=['cancelshot'])
 # def handle_ctrlz(message):
 #     global boxscore, shot_number, shot_score, andrey_score, dima_score
 #     boxscore['game_id'] = boxscore['game_id'][:-1]
