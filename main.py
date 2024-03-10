@@ -4,11 +4,13 @@ from io import StringIO
 from datetime import datetime
 from telebot import types
 import os
+import pandas as pd
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
-players = "D:\Projects\nerdiard\players.csv" #список всех пользователей бота
-live_players = "D:\Projects\nerdiard\live_players.csv" #список играющих в данных момент пользователей
+players_csv = "D:\Projects\nerdiard\players.csv" #список всех пользователей бота
+live_players = [] #список играющих в данных момент пользователей
 data = "D:\Projects\nerdiard\data.csv" #данные
+active_games = {}
 
 
 @bot.message_handler(commands=['start']) #обработка команды start и настройка кнопки menu
@@ -42,34 +44,41 @@ def handle_start(message):
 
 @bot.message_handler(func=lambda message: message.forward_from is not None) #старт партии и выбор игроков
 def choose_opponent(message):
-    global players, live_players
+    global players_csv, live_players
     player_1_id = message.from_user.id
     player_2_id = message.forward_from.id
-
+    players = pd.read_csv(players_csv)
     if player_2_id in live_players:
         bot.reply_to(message, 'Ваш оппонент уже в игре.')
         return
-    if not player_1_id in [player['id'] for player in players]:
-        players.append({'name': message.from_user.first_name, 'id': player_1_id})
-    if not player_2_id in [player['id'] for player in players]:
-        players.append({'name': message.forward_from.first_name, 'id': player_2_id})
+    if not players['id'].isin(player_1_id).any(): #добавление игроков в базу данных
+        players.append({'id': player_1_id, 'first_name': message.from_user.first_name,
+                        'username': message.from_user.username}, ignore_index=True)
+    if not players['id'].isin(player_2_id).any():  # добавление игроков в базу данных
+        players.append({'id': player_2_id, 'first_name': message.forward_from.first_name,
+                        'username': message.forward_from.username}, ignore_index=True)
 
     markup = types.InlineKeyboardMarkup()
 
-    player_1_id_name = next((player['name'] for player in players if player['id'] == player_1_id), None)
-    player_2_id_name = next((player['name'] for player in players if player['id'] == player_2_id), None)
+    player_1_first_name = next((player['name'] for player in players if player['id'] == player_1_id), None)
+    player_2_first_name = next((player['name'] for player in players if player['id'] == player_2_id), None)
 
-    button_1 = types.InlineKeyboardButton(f'{player_1_id_name}', callback_data='show_shot')
-    button_2 = types.InlineKeyboardButton(f'{player_2_id_name}', callback_data='show_shot')
+    button_1 = types.InlineKeyboardButton(f'{player_1_first_name}', callback_data='player_1_shot')
+    button_2 = types.InlineKeyboardButton(f'{player_2_first_name}', callback_data='player_2_shot')
     markup.add(button_1, button_2)
     bot.send_message(message.chat.id, f'Партия начинается, кто разбивает?', reply_markup=markup)
     live_players.append([player_1_id, player_2_id])
+    game_id = f'{player_1_id}-{player_2_id}-{datetime.now().date()}'
+    active_games[game_id] = {'player_1_id': player_1_id, 'player_2_id': player_2_id,
+                             'player_1_first_name': player_1_first_name, 'player_2_first_name': player_2_first_name,
+                             'player_1_score': 0, 'player_2_score': 0,
+                             'start_time': datetime.now().strftime('%H:%M:%S'),
+                             'shots': 0}
 
-
-
-@bot.callback_query_handler(func=lambda call: call.data == 'show_shot')
-def new_game(call):
-    global game_is_ongoing, start, shot_number, game_id, boxscore, andrey_score, dima_score
+@bot.callback_query_handler(func=lambda call: call.data in ['player_1_shot', 'player_2_shot'])
+def register_shot(call):
+    game_id = f'{call.from_user.id}-{call.message.forward_from.id}-{datetime.now().date()}'
+    game_state = active_games.get(game_id)
     game_is_ongoing = 1
     start = datetime.now()
     shot_number = 0
@@ -84,7 +93,7 @@ def new_game(call):
     bot.send_message(call.message.chat.id, 'Кто разбивает?', reply_markup=markup)
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ['Андрей', 'Дима'])
+@bot.callback_query_handler(func=lambda call: call.data == 'show_shot')
 def configure_shot(call):
     global player
     player = call.data
