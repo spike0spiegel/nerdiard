@@ -5,6 +5,9 @@ from datetime import datetime
 from telebot import types
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
+players = [] #список всех пользователей бота
+live_players = [] #список играющих в данных момент пользователей
+game_date = {}
 player, shot_type, shot_score, start, end = '', '', '', datetime, datetime
 game_is_ongoing = 0
 game_id = ''
@@ -14,18 +17,61 @@ shot_number = 0
 boxscore = {}
 
 
-@bot.message_handler(commands=['start'])
+@bot.message_handler(commands=['start']) #обработка команды start и настройка кнопки menu
 def handle_start(message):
-    # Create an inline keyboard with the new_game button
+
+    help_menu_command = types.BotCommand(command='help', description='Руководство.')
+    newgame_menu_command = types.BotCommand(command='newgame', description='Начать новую партию.')
+    register_player_menu_command = types.BotCommand(command='registerplayer', description='Зарегистрироваться.')
+    dropgame_menu_command = types.BotCommand(command='dropgame', description='Сбросить партию.')
+    cancelshot_menu_command = types.BotCommand(command='cancelshot', description='Отмена последнего удара.')
+
+    bot.set_my_commands([help_menu_command, #руководство
+                         newgame_menu_command, #начать новую партию
+                         dropgame_menu_command, #сбросить игру
+                         cancelshot_menu_command, #отменить последний удар
+                         register_player_menu_command #зарегистрироваться
+                         ])
+    bot.set_chat_menu_button(message.chat.id, types.MenuButtonCommands('commands'))
+
+    bot.send_message(message.chat.id, "Добро пожаловать. Управление осуществляется с помощью кнопки Menu.")
+
+@bot.message_handler(commands=['newgame']) #обработка команды new_game
+def handle_start(message):
+    global players, live_players
+
+    if message.from_user.id in live_players:
+        bot.reply_to(message, 'Вы уже в игре.')
+    else:
+        bot.reply_to(message, 'Перешлите сообщение от вашего оппонента боту, чтобы начать игру.')
+
+@bot.message_handler(func=lambda message: message.forward_from is not None) #старт партии и выбор игроков
+def choose_opponent(message):
+    global players, live_players
+    player_1 = message.from_user.id
+    player_2 = message.forward_from.id
+
+    if player_2 in live_players:
+        bot.reply_to(message, 'Ваш оппонент уже в игре.')
+    if not player_1 in [player['id'] for player in players]:
+        players.append({'name': message.from_user.first_name, 'id': player_1})
+    if not player_2 in [player['id'] for player in players]:
+        players.append({'name': message.forward_from.first_name, 'id': player_2})
+
     markup = types.InlineKeyboardMarkup()
-    button = types.InlineKeyboardButton(text="Начать новую партию.", callback_data="new_game")
-    markup.add(button)
-    bot.send_message(message.chat.id, "Добро пожаловать в бот. Нажмите кнопку ниже чтобы начать новую партию.",
-                     reply_markup=markup)
+
+    player_1_name = next((player['name'] for player in players if player['id'] == player_1), None)
+    player_2_name = next((player['name'] for player in players if player['id'] == player_2), None)
+
+    button_1 = types.InlineKeyboardButton(f'{player_1_name}', callback_data='show_shot')
+    button_2 = types.InlineKeyboardButton(f'{player_2_name}', callback_data='show_shot')
+    markup.add(button_1, button_2)
+    bot.send_message(message.chat.id, f'Партия начинается, кто разбивает?', reply_markup=markup)
+    live_players.append([player_1, player_2])
 
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'new_game')
+@bot.callback_query_handler(func=lambda call: call.data == 'show_shot')
 def new_game(call):
     global game_is_ongoing, start, shot_number, game_id, boxscore, andrey_score, dima_score
     game_is_ongoing = 1
@@ -70,7 +116,6 @@ def shot(call):
     shot_score = call.data[1]
 
     shot_number += 1
-
     if player == 'Андрей':
         andrey_score += int(shot_score)
     else:
@@ -138,6 +183,5 @@ def shot(call):
 #         elif player == 'Дима':
 #             dima_score -= 1
 #     bot.send_message(message.chat.id, f'Последний удар отменён, счёт остается прежним: {andrey_score} - {dima_score}')
-
 
 bot.polling(none_stop=True)
