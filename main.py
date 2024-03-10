@@ -43,27 +43,27 @@ def handle_start(message):
 @bot.message_handler(func=lambda message: message.forward_from is not None) #старт партии и выбор игроков
 def choose_opponent(message):
     global players, live_players
-    player_1 = message.from_user.id
-    player_2 = message.forward_from.id
+    player_1_id = message.from_user.id
+    player_2_id = message.forward_from.id
 
-    if player_2 in live_players:
+    if player_2_id in live_players:
         bot.reply_to(message, 'Ваш оппонент уже в игре.')
         return
-    if not player_1 in [player['id'] for player in players]:
-        players.append({'name': message.from_user.first_name, 'id': player_1})
-    if not player_2 in [player['id'] for player in players]:
-        players.append({'name': message.forward_from.first_name, 'id': player_2})
+    if not player_1_id in [player['id'] for player in players]:
+        players.append({'name': message.from_user.first_name, 'id': player_1_id})
+    if not player_2_id in [player['id'] for player in players]:
+        players.append({'name': message.forward_from.first_name, 'id': player_2_id})
 
     markup = types.InlineKeyboardMarkup()
 
-    player_1_name = next((player['name'] for player in players if player['id'] == player_1), None)
-    player_2_name = next((player['name'] for player in players if player['id'] == player_2), None)
+    player_1_id_name = next((player['name'] for player in players if player['id'] == player_1_id), None)
+    player_2_id_name = next((player['name'] for player in players if player['id'] == player_2_id), None)
 
-    button_1 = types.InlineKeyboardButton(f'{player_1_name}', callback_data='show_shot')
-    button_2 = types.InlineKeyboardButton(f'{player_2_name}', callback_data='show_shot')
+    button_1 = types.InlineKeyboardButton(f'{player_1_id_name}', callback_data='show_shot')
+    button_2 = types.InlineKeyboardButton(f'{player_2_id_name}', callback_data='show_shot')
     markup.add(button_1, button_2)
     bot.send_message(message.chat.id, f'Партия начинается, кто разбивает?', reply_markup=markup)
-    live_players.append([player_1, player_2])
+    live_players.append([player_1_id, player_2_id])
 
 
 
