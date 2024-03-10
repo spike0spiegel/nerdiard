@@ -3,18 +3,12 @@ import csv
 from io import StringIO
 from datetime import datetime
 from telebot import types
+import os
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
-players = [] #список всех пользователей бота
-live_players = [] #список играющих в данных момент пользователей
-game_date = {}
-player, shot_type, shot_score, start, end = '', '', '', datetime, datetime
-game_is_ongoing = 0
-game_id = ''
-andrey_score = 0
-dima_score = 0
-shot_number = 0
-boxscore = {}
+players = "D:\Projects\nerdiard\players.csv" #список всех пользователей бота
+live_players = "D:\Projects\nerdiard\live_players.csv" #список играющих в данных момент пользователей
+data = "D:\Projects\nerdiard\data.csv" #данные
 
 
 @bot.message_handler(commands=['start']) #обработка команды start и настройка кнопки menu
@@ -42,6 +36,7 @@ def handle_start(message):
 
     if message.from_user.id in live_players:
         bot.reply_to(message, 'Вы уже в игре.')
+        return
     else:
         bot.reply_to(message, 'Перешлите сообщение от вашего оппонента боту, чтобы начать игру.')
 
@@ -53,6 +48,7 @@ def choose_opponent(message):
 
     if player_2 in live_players:
         bot.reply_to(message, 'Ваш оппонент уже в игре.')
+        return
     if not player_1 in [player['id'] for player in players]:
         players.append({'name': message.from_user.first_name, 'id': player_1})
     if not player_2 in [player['id'] for player in players]:
