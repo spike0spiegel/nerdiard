@@ -2,6 +2,7 @@ import telebot
 from datetime import datetime
 from telebot import types
 import pandas as pd
+import csv
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
 players_csv = 'D:/Projects/nerdiard/players.csv' #список всех пользователей бота
@@ -165,11 +166,18 @@ def register_shot(call):
 
         player_1_accuracy = str(100 * game_state['player_1_score'] / player_1_count) + '%'
 
-        player_2_accuracy = str(100 * game_state['player_2_score'] / player_1_count) + '%'
+        player_2_accuracy = str(100 * game_state['player_2_score'] / player_2_count) + '%'
 
         bot.send_message(call.message.chat.id, f" Количество ударов - {game_state['shots']}."
                                                     f" Точность {game_state['player_1_first_name']} - {player_1_accuracy}"
                                                     f" Точность {game_state['player_2_first_name']} - {player_2_accuracy}")
+
+        with open('data', 'a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=game_state['game_data'].keys())
+            writer.writerow(game_state['game_data'])
+
+        del active_games[game_id]
+
 
 
 # @bot.message_handler(commands=['cancelshot'])
