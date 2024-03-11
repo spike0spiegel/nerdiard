@@ -189,9 +189,9 @@ def register_shot(call):
                                                     f" Точность {game_state['player_2_first_name']} - "
                                                f"{player_2_acc}")
 
-        # with open(data, 'a', newline='', encoding='utf-8') as f:
-        #     writer = csv.writer(f)
-        #     writer.writerows(game_state['game_data'])
+        with open(data, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(game_state['game_data'])
 
         del game_state
         del active_games[game_id]
