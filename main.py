@@ -16,12 +16,12 @@ def handle_start(message):
     #help_menu_command = types.BotCommand(command='help', description='Руководство.')
     newgame_menu_command = types.BotCommand(command='newgame', description='Начать новую партию.')
     myshooting_menu_command = types.BotCommand(command='myshooting', description='Посмотреть статистику моих ударов.')
-    #dropgame_menu_command = types.BotCommand(command='dropgame', description='Сбросить партию.')
+    dropgame_menu_command = types.BotCommand(command='dropgame', description='Сбросить партию.')
     cancelshot_menu_command = types.BotCommand(command='cancelshot', description='Отмена последнего удара.')
 
     bot.set_my_commands([#help_menu_command, #руководство
                          newgame_menu_command, #начать новую партию
-                         #dropgame_menu_command, #сбросить игру
+                         dropgame_menu_command, #сбросить игру
                          cancelshot_menu_command, #отменить последний удар
                          myshooting_menu_command #точность ударов
                          ])
@@ -80,7 +80,11 @@ def choose_opponent(message):
 def make_shot(call):
     global active_games
     game_id = f'{call.from_user.id}-{datetime.now().date()}'
-    game_state = active_games[game_id]
+
+    try:
+        game_state = active_games[game_id]
+    except:
+        return
 
     if call.data == 'player_1_shot':
         shooter_name = game_state['player_1_first_name']
@@ -131,7 +135,6 @@ def register_shot(call):
     bot.send_message(call.message.chat.id, f"Удар был записан. {game_state['player_1_first_name']} "
                                            f"{game_state['player_1_score']} - {game_state['player_2_score']} "
                                            f"{game_state['player_2_first_name']}.")
-    bot.send_message(call.message.chat.id, str(game_state['player_1_id'])+ ' ' + str(game_state['player_2_id']))
     game_state['game_data'].append([game_id,
                                     datetime.now().strftime("%H:%M:%S"),
                                     ['',game_state['player_1_id'], game_state['player_2_id']][game_state['shooter']],
@@ -195,23 +198,60 @@ def register_shot(call):
 
 
 
-# @bot.message_handler(commands=['cancelshot'])
-# def handle_ctrlz(message):
-#     global boxscore, shot_number, shot_score, andrey_score, dima_score
-#     boxscore['game_id'] = boxscore['game_id'][:-1]
-#     boxscore['shot_number'] = boxscore['shot_number'][:-1]
-#     boxscore['player'] = boxscore['player'][:-1]
-#     boxscore['timestamp'] = boxscore['timestamp'][:-1]
-#     boxscore['shot_type'] = boxscore['shot_type'][:-1]
-#     boxscore['shot_score'] = boxscore['shot_score'][:-1]
-#     shot_number -= 1
-#     if shot_score == '1':
-#         if player == 'Андрей':
-#             andrey_score -= 1
-#         elif player == 'Дима':
-#             dima_score -= 1
-#     bot.send_message(message.chat.id, f'Последний удар отменён, счёт остается прежним: {andrey_score} - {dima_score}')
+@bot.message_handler(commands=['cancelshot'])
+def handle_cancelshot(message):
+    global active_games, data
+    game_id = f'{message.from_user.id}-{datetime.now().date()}'
+    try:
+        game_state = active_games[game_id]
+    except:
+        return
 
+    deleted_row = game_state['game_data'].pop(-1)
+    deleted_score = deleted_row[4]
+    deleted_player_id = deleted_row[2]
+    game_state['shots'] -= 1
+    if deleted_player_id == game_state['player_1_id']:
+        game_state['player_1_score'] -= int(deleted_score)
+    elif deleted_player_id == game_state['player_2_id']:
+        game_state['player_2_score'] -= int(deleted_score)
+
+    if deleted_score == 1:
+        if game_state['shooter'] == 1:
+            game_state['shooter'] = 2
+            callback_data = 'player_2_shot'
+        else:
+            game_state['shooter'] = 1
+            callback_data = 'player_1_shot'
+    else:
+        if game_state['shooter'] == 1:
+            callback_data = 'player_1_shot'
+        else:
+            callback_data = 'player_2_shot'
+
+    markup = types.InlineKeyboardMarkup()
+
+    button_1 = types.InlineKeyboardButton(f'Подтвердить.', callback_data=callback_data)
+    markup.add(button_1)
+    bot.send_message(message.chat.id, f"Удар отменён, счёт прежний {game_state['player_1_first_name']} - "
+                                        f"{game_state['player_1_score']} :"
+                                        f" {game_state['player_2_score']} - {game_state['player_2_first_name']}.",
+                     reply_markup=markup)
+
+
+@bot.message_handler(commands=['dropgame'])
+def handle_dropgame(message):
+    global active_games, data
+    game_id = f'{message.from_user.id}-{datetime.now().date()}'
+    try:
+        game_state = active_games[game_id]
+    except:
+        return
+
+    del game_state
+    del active_games[game_id]
+
+    bot.send_message(message.chat.id, 'Партия остановлена.')
 #-----------------------------------------------------
 #STATS#
 def player_accuracy(player_id):
@@ -240,7 +280,7 @@ def player_accuracy(player_id):
     return {'accuracy': accuracy, 'ch': ch, 'sv': sv, 'accuracy_ch': accuracy_ch, 'accuracy_sv': accuracy_sv}
 
 @bot.message_handler(commands=['myshooting']) #обработка команды new_game
-def handle_start(message):
+def handle_shooting(message):
     global data
     players = pd.read_csv(data)['player_id'].unique()
     if message.from_user.id not in players:
