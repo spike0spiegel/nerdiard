@@ -2,8 +2,6 @@ import telebot
 from datetime import datetime
 from telebot import types
 import pandas as pd
-import csv
-from io import StringIO
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
 players_csv = 'D:/Projects/nerdiard/players.csv' #список всех пользователей бота
@@ -15,17 +13,17 @@ active_games = {}
 @bot.message_handler(commands=['start']) #обработка команды start и настройка кнопки menu
 def handle_start(message):
 
-    help_menu_command = types.BotCommand(command='help', description='Руководство.')
+    #help_menu_command = types.BotCommand(command='help', description='Руководство.')
     newgame_menu_command = types.BotCommand(command='newgame', description='Начать новую партию.')
-    register_player_menu_command = types.BotCommand(command='registerplayer', description='Зарегистрироваться.')
-    dropgame_menu_command = types.BotCommand(command='dropgame', description='Сбросить партию.')
+    myshooting_menu_command = types.BotCommand(command='myshooting', description='Посмотреть статистику моих ударов.')
+    #dropgame_menu_command = types.BotCommand(command='dropgame', description='Сбросить партию.')
     cancelshot_menu_command = types.BotCommand(command='cancelshot', description='Отмена последнего удара.')
 
-    bot.set_my_commands([help_menu_command, #руководство
+    bot.set_my_commands([#help_menu_command, #руководство
                          newgame_menu_command, #начать новую партию
-                         dropgame_menu_command, #сбросить игру
+                         #dropgame_menu_command, #сбросить игру
                          cancelshot_menu_command, #отменить последний удар
-                         register_player_menu_command #зарегистрироваться
+                         myshooting_menu_command #точность ударов
                          ])
     bot.set_chat_menu_button(message.chat.id, types.MenuButtonCommands('commands'))
 
@@ -116,7 +114,10 @@ def make_shot(call):
 def register_shot(call):
     global active_games, data
     game_id = f'{call.from_user.id}-{datetime.now().date()}'
-    game_state = active_games[game_id]
+    try:
+        game_state = active_games[game_id]
+    except:
+        return
     game_state['shots'] += 1
     shot_type = call.data[0]
     shot_score = call.data[1]
@@ -130,10 +131,10 @@ def register_shot(call):
     bot.send_message(call.message.chat.id, f"Удар был записан. {game_state['player_1_first_name']} "
                                            f"{game_state['player_1_score']} - {game_state['player_2_score']} "
                                            f"{game_state['player_2_first_name']}.")
-
+    bot.send_message(call.message.chat.id, str(game_state['player_1_id'])+ ' ' + str(game_state['player_2_id']))
     game_state['game_data'].append([game_id,
-                                    ['',game_state['player_1_id'], game_state['player_1_id']][game_state['shooter']],
                                     datetime.now().strftime("%H:%M:%S"),
+                                    ['',game_state['player_1_id'], game_state['player_2_id']][game_state['shooter']],
                                     shot_type,
                                     shot_score])
 
@@ -149,6 +150,9 @@ def register_shot(call):
     else:
         game_state['end_time'] = datetime.now()
 
+        for row in game_state['game_data']:
+            row[0] += str(game_state['end_time'])[-5:]
+
         time_difference = game_state['end_time'] - game_state['start_time']
         minutes = str(time_difference.total_seconds() // 60).split('.')[0]
         seconds = str(time_difference.total_seconds() % 60).split('.')[0]
@@ -158,33 +162,33 @@ def register_shot(call):
                                                f" {game_state['player_1_first_name']} - {game_state['player_1_score']} :"
                                                f" {game_state['player_2_score']} - {game_state['player_2_first_name']}.")
 
-        # player_1_count, player_2_count, player_1_scored, player_2_scored = 0, 0, 0, 0
-        # for row in game_state['game_data']:
-        #     if row[1] == game_state['player_1_id']:
-        #         if row[4] == '0':
-        #             player_1_count += 1
-        #         else:
-        #             player_1_count += 1
-        #             player_1_scored += 1
-        #     if row[1] == game_state['player_2_id']:
-        #         if row[4] == '0':
-        #             player_2_count += 1
-        #         else:
-        #             player_2_count += 1
-        #             player_2_scored += 1
-        # player_1_acc = str(100 * player_1_scored / player_1_count)[:5] + '%'
-        # player_2_acc = str(100 * player_2_scored / player_2_count)[:5] + '%'
-        #
-        #
-        # bot.send_message(call.message.chat.id, f" Количество ударов - {game_state['shots']}."
-        #                                             f" Точность {game_state['player_1_first_name']} -"
-        #                                        f" {player_1_acc}"
-        #                                             f" Точность {game_state['player_2_first_name']} - "
-        #                                        f"{player_2_acc}")
+        player_1_count, player_2_count, player_1_scored, player_2_scored = 0, 0, 0, 0
+        for row in game_state['game_data']:
+            if row[2] == game_state['player_1_id']:
+                if row[4] == '0':
+                    player_1_count += 1
+                else:
+                    player_1_count += 1
+                    player_1_scored += 1
+            elif row[2] == game_state['player_2_id']:
+                if row[4] == '0':
+                    player_2_count += 1
+                else:
+                    player_2_count += 1
+                    player_2_scored += 1
+        player_1_acc = str(100 * player_1_scored / player_1_count)[:5] + '%'
+        player_2_acc = str(100 * player_2_scored / player_2_count)[:5] + '%'
 
-        with open(data, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerows(game_state['game_data'])
+
+        bot.send_message(call.message.chat.id, f" Количество ударов - {game_state['shots']}."
+                                                    f" Точность {game_state['player_1_first_name']} -"
+                                               f" {player_1_acc}"
+                                                    f" Точность {game_state['player_2_first_name']} - "
+                                               f"{player_2_acc}")
+
+        # with open(data, 'a', newline='', encoding='utf-8') as f:
+        #     writer = csv.writer(f)
+        #     writer.writerows(game_state['game_data'])
 
         del game_state
         del active_games[game_id]
@@ -207,5 +211,45 @@ def register_shot(call):
 #         elif player == 'Дима':
 #             dima_score -= 1
 #     bot.send_message(message.chat.id, f'Последний удар отменён, счёт остается прежним: {andrey_score} - {dima_score}')
+
+#-----------------------------------------------------
+#STATS#
+def player_accuracy(player_id):
+    df = pd.read_csv(data)
+
+    player_df = df[df['player_id'] == int(player_id)]
+    player_df_ch = df[(df['player_id'] == int(player_id)) & (df['shot_type'] == 'Ч')]
+    player_df_sv = df[(df['player_id'] == int(player_id)) & (df['shot_type'] == 'С')]
+
+    non_zero_score_shots = player_df[player_df['shot_score'] != 0]['shot_score'].count()
+    total_shots = player_df['shot_score'].count()
+    accuracy = str(100 * non_zero_score_shots / total_shots)[:4] + '%'
+
+    non_zero_score_shots_ch = player_df_ch[player_df_ch['shot_score'] != 0]['shot_score'].count()
+    total_shots_ch = player_df_ch['shot_score'].count()
+    accuracy_ch = str(100 * non_zero_score_shots_ch / total_shots_ch)[:4] + '%'
+
+
+    non_zero_score_shots_sv = player_df_sv[player_df_sv['shot_score'] != 0]['shot_score'].count()
+    total_shots_sv = player_df_sv['shot_score'].count()
+    accuracy_sv = str(100 * non_zero_score_shots_sv / total_shots_sv)[:4] + '%'
+
+    ch = str(100 * total_shots_ch / total_shots)[:4] + '%'
+    sv = str(100 * total_shots_sv / total_shots)[:4] + '%'
+
+    return {'accuracy': accuracy, 'ch': ch, 'sv': sv, 'accuracy_ch': accuracy_ch, 'accuracy_sv': accuracy_sv}
+
+@bot.message_handler(commands=['myshooting']) #обработка команды new_game
+def handle_start(message):
+    global data
+    players = pd.read_csv(data)['player_id'].unique()
+    if message.from_user.id not in players:
+        bot.reply_to(message, 'Вы ещё не сыграли ни одной партии.')
+    else:
+        bot.reply_to(message,   f"Общая точность - {player_accuracy(message.from_user.id)['accuracy']}.\n"
+                                    f"{player_accuracy(message.from_user.id)['ch']} ударов - чужие.\n"
+                                    f"{player_accuracy(message.from_user.id)['sv']} ударов - свои.\n"
+                                    f"Точность чужих - {player_accuracy(message.from_user.id)['accuracy_ch']}.\n"
+                                    f"Точность своих - {player_accuracy(message.from_user.id)['accuracy_sv']}.")
 
 bot.polling(none_stop=True)
