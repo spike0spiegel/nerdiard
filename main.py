@@ -39,7 +39,7 @@ def handle_newgame(message):
 
 @bot.message_handler(func=lambda message: message.forward_from is not None) #старт партии и выбор игроков
 def choose_opponent(message):
-    from sql_functions import switch_active_player, create_live_game
+    from sql_functions import switch_active_player, create_live_game, get_live_game_id
     player_1_id = message.from_user.id
     player_2_id = message.forward_from.id
     from sql_functions import check_active_player
@@ -58,31 +58,19 @@ def choose_opponent(message):
     button_2 = types.InlineKeyboardButton(f'{player_2_first_name}', callback_data='player_2_shot')
     markup.add(button_1, button_2)
     bot.send_message(message.chat.id, f'Партия начинается, кто разбивает?', reply_markup=markup)
-    game_id = create_live_game(player_1_id, player_2_id)
-    active_games[game_id] = {'player_1_id': player_1_id, 'player_2_id': player_2_id,
-                             'player_1_first_name': player_1_first_name, 'player_2_first_name': player_2_first_name,
-                             'player_1_score': 0, 'player_2_score': 0,
-                             'start_time': datetime.now(),
-                             'shots': 0,
-                             'game_data': [],
-                             'shooter': ''}
+
+    create_live_game(player_1_id, player_2_id, player_1_first_name, player_2_first_name)
 
 @bot.callback_query_handler(func=lambda call: call.data in ['player_1_shot', 'player_2_shot'])
-def make_shot(call):
-    global active_games
-    game_id = f'{call.from_user.id}-{datetime.now().date()}'
-
-    try:
-        game_state = active_games[game_id]
-    except:
+def configure_shot(call):
+    from sql_functions import get_live_game_id, set_shooter
+    game_id = get_live_game_id(call.from_user.id)
+    if not game_id:
         return
 
-    if call.data == 'player_1_shot':
-        shooter_name = game_state['player_1_first_name']
-        game_state['shooter'] = 1
-    elif call.data == 'player_2_shot':
-        shooter_name = game_state['player_2_first_name']
-        game_state['shooter'] = 2
+    shooter_id = (game_id.strip('_')[0], game_id.strip('_')[1])[call.data == 'player_2_shot']
+    shooter_name =
+    set_shooter(game_id, shooter_name)
 
     shot_data = types.InlineKeyboardMarkup()
 
@@ -93,54 +81,32 @@ def make_shot(call):
     button_s0 = types.InlineKeyboardButton('C0', callback_data='С0')
     button_s1 = types.InlineKeyboardButton('C1', callback_data='С1')
     button_s2 = types.InlineKeyboardButton('C2', callback_data='С2')
+    button_o = types.InlineKeyboardButton('O', callback_data='O')
 
     shot_data.add(button_ch0, button_ch1, button_ch2)
     shot_data.add(button_s0, button_s1, button_s2)
-
-    if game_state['shooter'] == 1:
-        shooter_name = game_state['player_1_first_name']
-    elif game_state['shooter'] == 2:
-        shooter_name = game_state['player_2_first_name']
+    shot_data.add(button_o)
 
     bot.send_message(call.message.chat.id, f'Введите удар игрока {shooter_name}', reply_markup=shot_data)
 
 
-@bot.callback_query_handler(func=lambda call: call.data in ['Ч0', 'Ч1', 'Ч2', 'С0', 'С1', 'С2'])
+@bot.callback_query_handler(func=lambda call: call.data in ['Ч0', 'Ч1', 'Ч2', 'С0', 'С1', 'С2', 'O'])
 def register_shot(call):
-    global active_games, data
-    game_id = f'{call.from_user.id}-{datetime.now().date()}'
-    try:
-        game_state = active_games[game_id]
-    except:
+    from sql_functions import get_live_game_id, switch_shooter, register_shot
+    game_id = get_live_game_id(call.from_user.id)
+    if not game_id:
         return
-    game_state['shots'] += 1
     shot_type = call.data[0]
     shot_score = call.data[1]
-
-    if game_state['shooter'] == 1:
-        game_state['player_1_score'] += int(shot_score)
-    else:
-        game_state['player_2_score'] += int(shot_score)
-
-
-    bot.send_message(call.message.chat.id, f"Удар был записан. {game_state['player_1_first_name']} "
-                                           f"{game_state['player_1_score']} - {game_state['player_2_score']} "
-                                           f"{game_state['player_2_first_name']}.")
-    game_state['game_data'].append([game_id,
-                                    datetime.now().strftime("%H:%M:%S"),
-                                    ['',game_state['player_1_id'], game_state['player_2_id']][game_state['shooter']],
-                                    shot_type,
-                                    shot_score])
+    register_shot(game_id, shot_type,shot_score,)
+    bot.send_message(call.message.chat.id, f"Удар был записан. ")
 
     if shot_score == '0':
-        if game_state['shooter'] == 1:
-            game_state['shooter'] = 2
-        else:
-            game_state['shooter'] = 1
+
 
 
     if not (game_state['player_1_score'] >= 8 or game_state['player_2_score'] >= 8):
-        make_shot(call)
+        configure_shot(call)
     else:
         game_state['end_time'] = datetime.now()
 
