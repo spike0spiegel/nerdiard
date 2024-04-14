@@ -257,16 +257,12 @@ def handle_dropgame(message):
 
 @bot.message_handler(commands=['myshooting']) #обработка команды new_game
 def handle_shooting(message):
-    from stats_functions import calculate_player_accuracy
+    from sql_functions import get_player_accuracy
     global data
     players = pd.read_csv(data)['player_id'].unique()
     if message.from_user.id not in players:
         bot.reply_to(message, 'Вы ещё не сыграли ни одной партии.')
     else:
-        bot.reply_to(message,   f"Общая точность - {calculate_player_accuracy(message.from_user.id)['accuracy']}.\n"
-                                    f"{calculate_player_accuracy(message.from_user.id)['ch']} ударов - чужие.\n"
-                                    f"{calculate_player_accuracy(message.from_user.id)['sv']} ударов - свои.\n"
-                                    f"Точность чужих - {calculate_player_accuracy(message.from_user.id)['accuracy_ch']}.\n"
-                                    f"Точность своих - {calculate_player_accuracy(message.from_user.id)['accuracy_sv']}.")
+        bot.reply_to(message,   f"Общая точность - {get_player_accuracy(message.from_user.id)}.\n")
 
 bot.polling(none_stop=True)
