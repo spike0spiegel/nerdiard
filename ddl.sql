@@ -51,4 +51,6 @@ CREATE TABLE players (
 	player_id VARCHAR(15) PRIMARY KEY,
 	player_username VARCHAR(50),
 	player_active_status BOOLEAN);
+
+SELECT * FROM shots ORDER BY game_id, shot_time;
 	
