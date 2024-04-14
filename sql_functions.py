@@ -62,3 +62,36 @@ def check_active_player(player_id: int) -> bool:
         return False
     else:
         return True
+
+
+def switch_active_player(player_id: int) -> None:
+    """Функция, которая переключает статус активности у игрока."""
+    query = """ UPDATE players 
+                SET player_active_status = NOT player_active_status
+                WHERE player_id = '{player_id}'""".format(player_id=player_id)
+    cursor = conn.cursor()
+    cursor.execute('SET search_path TO nerdiard')
+    cursor.execute(query)
+    conn.commit()
+    cursor.close()
+    return
+
+
+def create_live_game(player_1_id, player_2_id: int) -> str:
+    """Функция создаёт активную игру чтобы к ней можно обращаться для взятия id.
+    В таблице активных игр только 1 столбец,записи в котором будут стираться и удаляться.
+     game_id это комбинация двух player_id и даты-времени начала партии"""
+    from datetime import datetime
+    game_id = f"{player_1_id}_{player_2_id}_{datetime.now().date()}_{datetime.now().time().strftime('%H:%M:%S')}"
+
+    query = """ INSERT INTO live_games
+                VALUES ({game_id})
+                ON CONFLICT DO NOTHING""".format(game_id=game_id)
+    cursor = conn.cursor()
+    cursor.execute('SET search_path TO nerdiard')
+    cursor.execute(query)
+    conn.commit()
+    cursor.close()
+    return game_id
+
+def
