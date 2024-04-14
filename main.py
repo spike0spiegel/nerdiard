@@ -5,14 +5,10 @@ import pandas as pd
 import csv
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
-players_csv = 'D:/Projects/nerdiard/players.csv' #список всех пользователей бота
-live_players = [] #список играющих в данных момент пользователей
-data = 'D:/Projects/nerdiard/data.csv' #данные
-active_games = {}
 
-
-@bot.message_handler(commands=['start']) #обработка команды start и настройка кнопки menu
+@bot.message_handler(commands=['start'])
 def handle_start(message):
+    """Обработка команды start, создание кнопки меню и приветственное сообщение."""
 
     #help_menu_command = types.BotCommand(command='help', description='Руководство.')
     newgame_menu_command = types.BotCommand(command='newgame', description='Начать новую партию.')
@@ -30,33 +26,28 @@ def handle_start(message):
 
     bot.send_message(message.chat.id, "Добро пожаловать. Управление осуществляется с помощью кнопки Menu.")
 
-@bot.message_handler(commands=['newgame']) #обработка команды new_game
-def handle_start(message):
-    global players, live_players
-
-    if message.from_user.id in live_players:
+@bot.message_handler(commands=['newgame'])
+def handle_newgame(message):
+    """Обработка команды newgame. Если тот, кто отправляет эту команду, уже в игре, то будет написано,
+    что он уже в игре. Если нет, то пользователю предложат переслать сообщение от противника боту."""
+    from sql_functions import check_active_player
+    if check_active_player(message.from_user.id):
         bot.reply_to(message, 'Вы уже в игре.')
         return
     else:
-        bot.reply_to(message, 'Перешлите сообщение от вашего оппонента боту, чтобы начать игру.')
+        bot.reply_to(message, 'Перешлите любое сообщение от вашего оппонента боту, чтобы начать игру.')
 
 @bot.message_handler(func=lambda message: message.forward_from is not None) #старт партии и выбор игроков
 def choose_opponent(message):
-    global players_csv, live_players, active_games
+    from sql_functions import switch_active_player, create_live_game
     player_1_id = message.from_user.id
     player_2_id = message.forward_from.id
-    players = pd.read_csv(players_csv)
-    if player_2_id in live_players:
+    from sql_functions import check_active_player
+    if check_active_player(player_2_id):
         bot.reply_to(message, 'Ваш оппонент уже в игре.')
         return
-    if not player_1_id in players['id'].unique(): #добавление игроков в базу данных
-        players._append({'id': player_1_id, 'first_name': message.from_user.first_name,
-                        'username': message.from_user.username}, ignore_index=True)
-    if not player_2_id in players['id'].unique():  # добавление игроков в базу данных
-        players._append({'id': player_2_id, 'first_name': message.forward_from.first_name,
-                        'username': message.forward_from.username}, ignore_index=True)
-
-    players.to_csv(players_csv, index=False)
+    switch_active_player(player_1_id)
+    switch_active_player(player_2_id)
 
     markup = types.InlineKeyboardMarkup()
 
@@ -67,8 +58,7 @@ def choose_opponent(message):
     button_2 = types.InlineKeyboardButton(f'{player_2_first_name}', callback_data='player_2_shot')
     markup.add(button_1, button_2)
     bot.send_message(message.chat.id, f'Партия начинается, кто разбивает?', reply_markup=markup)
-    live_players.append([player_1_id, player_2_id])
-    game_id = f'{player_1_id}-{datetime.now().date()}'
+    game_id = create_live_game(player_1_id, player_2_id)
     active_games[game_id] = {'player_1_id': player_1_id, 'player_2_id': player_2_id,
                              'player_1_first_name': player_1_first_name, 'player_2_first_name': player_2_first_name,
                              'player_1_score': 0, 'player_2_score': 0,
