@@ -63,13 +63,12 @@ def choose_opponent(message):
 
 @bot.callback_query_handler(func=lambda call: call.data in ['player_1_shot', 'player_2_shot'])
 def configure_shot(call):
-    from sql_functions import get_live_game_id, set_shooter
+    from sql_functions import get_live_game_id, set_shooter, get_shooter
     game_id = get_live_game_id(call.from_user.id)
     if not game_id:
         return
-
     shooter_id = (game_id.strip('_')[0], game_id.strip('_')[1])[call.data == 'player_2_shot']
-    shooter_name =
+    shooter_name = get_shooter(shooter_id, game_id)
     set_shooter(game_id, shooter_name)
 
     shot_data = types.InlineKeyboardMarkup()
@@ -92,66 +91,22 @@ def configure_shot(call):
 
 @bot.callback_query_handler(func=lambda call: call.data in ['Ч0', 'Ч1', 'Ч2', 'С0', 'С1', 'С2', 'O'])
 def register_shot(call):
-    from sql_functions import get_live_game_id, switch_shooter, register_shot
+    from sql_functions import get_live_game_id, switch_shooter, register_shot, check_endgame, remove_live_game
     game_id = get_live_game_id(call.from_user.id)
     if not game_id:
         return
     shot_type = call.data[0]
     shot_score = call.data[1]
     register_shot(game_id, shot_type,shot_score,)
-    bot.send_message(call.message.chat.id, f"Удар был записан. ")
+    bot.send_message(call.message.chat.id, f"Удар был записан.")
 
     if shot_score == '0':
-
-
-
-    if not (game_state['player_1_score'] >= 8 or game_state['player_2_score'] >= 8):
+        switch_shooter(game_id)
+    if not check_endgame(game_id):
         configure_shot(call)
     else:
-        game_state['end_time'] = datetime.now()
-
-        for row in game_state['game_data']:
-            row[0] += str(game_state['end_time'])[-5:]
-
-        time_difference = game_state['end_time'] - game_state['start_time']
-        minutes = str(time_difference.total_seconds() // 60).split('.')[0]
-        seconds = str(time_difference.total_seconds() % 60).split('.')[0]
-
-        bot.send_message(call.message.chat.id, f"Партия завершена за {minutes}:"
-                                               f"{seconds} со счётом"
-                                               f" {game_state['player_1_first_name']} - {game_state['player_1_score']} :"
-                                               f" {game_state['player_2_score']} - {game_state['player_2_first_name']}.")
-
-        player_1_count, player_2_count, player_1_scored, player_2_scored = 0, 0, 0, 0
-        for row in game_state['game_data']:
-            if row[2] == game_state['player_1_id']:
-                if row[4] == '0':
-                    player_1_count += 1
-                else:
-                    player_1_count += 1
-                    player_1_scored += 1
-            elif row[2] == game_state['player_2_id']:
-                if row[4] == '0':
-                    player_2_count += 1
-                else:
-                    player_2_count += 1
-                    player_2_scored += 1
-        player_1_acc = str(100 * player_1_scored / player_1_count)[:5] + '%'
-        player_2_acc = str(100 * player_2_scored / player_2_count)[:5] + '%'
-
-
-        bot.send_message(call.message.chat.id, f" Количество ударов - {game_state['shots']}."
-                                                    f" Точность {game_state['player_1_first_name']} -"
-                                               f" {player_1_acc}"
-                                                    f" Точность {game_state['player_2_first_name']} - "
-                                               f"{player_2_acc}")
-
-        with open(data, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerows(game_state['game_data'])
-
-        del game_state
-        del active_games[game_id]
+        #убрать строку из live_game, отправить сообщение об окончании игры, скомпоновать строки из shots в таблицу games
+        remove_live_game(game_id)
 
 
 

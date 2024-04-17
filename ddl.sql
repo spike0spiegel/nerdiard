@@ -52,5 +52,16 @@ CREATE TABLE players (
 	player_username VARCHAR(50),
 	player_active_status BOOLEAN);
 
-SELECT * FROM shots ORDER BY game_id, shot_time;
+CREATE TABLE live_games (
+	game_id VARCHAR(50) PRIMARY KEY,
+	player_1_id VARCHAR(15),
+	player_2_id VARCHAR(15),
+	player_1_name VARCHAR(20),
+	player_2_name VARCHAR(20),
+	player_1_score INT,
+	player_2_score INT,
+	shooter_id VARCHAR(15),
+	shooter_name VARCHAR(20));
+
+
 	
