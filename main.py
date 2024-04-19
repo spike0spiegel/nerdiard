@@ -2,7 +2,6 @@ import telebot
 from datetime import datetime
 from telebot import types
 import pandas as pd
-import csv
 
 bot = telebot.TeleBot('6850191251:AAH1OLlxBoCd09ZSzIojE5h04DR0DawvwEY')
 
@@ -32,17 +31,16 @@ def handle_newgame(message):
     что он уже в игре. Если нет, то пользователю предложат переслать сообщение от противника боту."""
     from sql_functions import check_active_player
     if check_active_player(message.from_user.id):
-        bot.reply_to(message, 'Вы уже в игре.')
-        return
+         bot.reply_to(message, 'Вы уже в игре.')
+         return
     else:
-        bot.reply_to(message, 'Перешлите любое сообщение от вашего оппонента боту, чтобы начать игру.')
+         bot.reply_to(message, 'Перешлите любое сообщение от вашего оппонента боту, чтобы начать игру.')
 
 @bot.message_handler(func=lambda message: message.forward_from is not None) #старт партии и выбор игроков
 def choose_opponent(message):
-    from sql_functions import switch_active_player, create_live_game, get_live_game_id
+    from sql_functions import switch_active_player, create_live_game, check_active_player
     player_1_id = message.from_user.id
     player_2_id = message.forward_from.id
-    from sql_functions import check_active_player
     if check_active_player(player_2_id):
         bot.reply_to(message, 'Ваш оппонент уже в игре.')
         return

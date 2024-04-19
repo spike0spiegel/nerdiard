@@ -52,7 +52,7 @@ def check_active_player(player_id: int) -> bool:
     query = """ SELECT * 
                 FROM players 
                 WHERE   player_id = '{player_id}'
-                        and player_activestatus = True """.format(player_id=player_id)
+                        and player_active_status = True """.format(player_id=player_id)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
     cursor.execute(query)
@@ -86,9 +86,9 @@ def create_live_game(player_1_id, player_2_id: int, player_1_name, player_2_name
 
     query = """ INSERT INTO live_games 
                 (game_id, player_1_id, player_2_id, player_1_name, player_2_name,
-                 player_1_score, player_2_score, shooter)
+                 player_1_score, player_2_score, shooter_id, shooter_name)
                 VALUES 
-                ({game_id}, {player_1_id}, {player_2_id}, {player_1_name}, {player_2_name}, 0, 0, Null)
+                ('{game_id}', '{player_1_id}', '{player_2_id}', '{player_1_name}', '{player_2_name}', 0, 0, Null, Null)
                 ON CONFLICT DO NOTHING""".format(game_id=game_id, player_1_id=player_1_id, player_2_id=player_2_id,
                                                  player_1_name=player_1_name, player_2_name=player_2_name)
     cursor = conn.cursor()
@@ -122,7 +122,7 @@ def get_shooter(game_id, shooter_id):
                 ELSE player_2_name
                 END
                 FROM live_games lg
-                WHERE game_id = '${game_id}%'""".format(shooter_id=shooter_id, game_id=game_id)
+                WHERE game_id = '{game_id}'""".format(shooter_id=shooter_id, game_id=game_id)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
     cursor.execute(query)
