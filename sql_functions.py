@@ -118,7 +118,7 @@ def get_shooter(game_id, shooter_id):
      отправляет бот."""
     query = """ SELECT
                 CASE 
-                WHEN '%{shooter_id}%' = player_1_id THEN player_1_name
+                WHEN player_1_id = '{shooter_id}' THEN player_1_name
                 ELSE player_2_name
                 END
                 FROM live_games lg
@@ -134,7 +134,7 @@ def get_shooter(game_id, shooter_id):
 def set_shooter(game_id, shooter: str) -> None:
     """Функция, которая назначает бьющего."""
     query = """ UPDATE live_games
-                SET shooter = {shooter} 
+                SET shooter_name = '{shooter}'
                 WHERE game_id = '{game_id}'""".format(game_id=game_id, shooter=shooter)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')

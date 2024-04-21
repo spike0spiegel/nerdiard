@@ -65,8 +65,9 @@ def configure_shot(call):
     game_id = get_live_game_id(call.from_user.id)
     if not game_id:
         return
-    shooter_id = (game_id.strip('_')[0], game_id.strip('_')[1])[call.data == 'player_2_shot']
-    shooter_name = get_shooter(shooter_id, game_id)
+    shooter_id = (game_id.split('_')[0], game_id.split('_')[1])[call.data == 'player_2_shot']
+    shooter_name = get_shooter(game_id, shooter_id)
+    print(shooter_id, shooter_name)
     set_shooter(game_id, shooter_name)
 
     shot_data = types.InlineKeyboardMarkup()
