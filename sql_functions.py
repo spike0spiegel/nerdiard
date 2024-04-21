@@ -112,44 +112,48 @@ def get_live_game_id(player_id: int) -> str:
     cursor.close()
     return str(*game_id[0])
 
-
-def get_shooter(game_id, shooter_id):
-    """Функция возвращает имя бьющего из таблицы live_games по его id. Потом оно используется в сообщениях, которые
-     отправляет бот."""
-    query = """ SELECT
-                CASE 
-                WHEN player_1_id = '{shooter_id}' THEN player_1_name
-                ELSE player_2_name
-                END
-                FROM live_games lg
-                WHERE game_id = '{game_id}'""".format(shooter_id=shooter_id, game_id=game_id)
+def shooter(game_id, shooter_id: str) -> str:
+    """Функция, которая назначает бьющего."""
+    query = """ WITH get_shooter_name_cte AS (
+                SELECT
+                                CASE 
+                                WHEN player_1_id = '{shooter_id}' THEN player_1_name
+                                ELSE player_2_name
+                                END  AS shooter_name
+                                FROM live_games lg
+                                WHERE game_id = '{game_id}')
+                UPDATE live_games
+                SET shooter_id = '{shooter_id}', shooter_name = cte.shooter_name
+                FROM get_shooter_name_cte cte
+                WHERE game_id = '{game_id}'
+                RETURNING cte.shooter_name """.format(game_id=game_id, shooter_id=shooter_id)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
     cursor.execute(query)
     shooter_name = cursor.fetchall()
+    conn.commit()
     cursor.close()
     return str(*shooter_name[0])
 
-
-def set_shooter(game_id, shooter: str) -> None:
-    """Функция, которая назначает бьющего."""
-    query = """ UPDATE live_games
-                SET shooter_name = '{shooter}'
-                WHERE game_id = '{game_id}'""".format(game_id=game_id, shooter=shooter)
+def get_shooter_id(game_id: str) -> str:
+    """Возвращает значение в столбце shooter_id из таблицы live_games для соответсвующей game_id"""
+    query = """ SELECT shooter_id
+                FROM live_games
+                WHERE game_id = '{game_id}'""".format(game_id=game_id)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
     cursor.execute(query)
+    shooter_id = cursor.fetchall()
     conn.commit()
     cursor.close()
-    return
+    return str(*shooter_id[0])
 
-
-def register_shot(game_id: str, shot_type: str, shot_score: int, shooter_id: int) -> None:
+def register_shot(game_id: str, shot_type: str, shot_score: int, shooter_id: str) -> None:
     """Функция, которая записывает одну строку в таблицу shots и если необходимо, то обновляет счёт в live_games"""
     from datetime import datetime
     dt = datetime.now().time().strftime('%H:%M:%S')
     query_insert = """INSERT INTO shots (game_id, shot_time, player_id, shot_type, shot_score)
-                VALUES ({game_id}, {dt}, {shooter_id}, {shot_type}, {shot_score})""".format(
+                VALUES ('{game_id}', '{dt}', '{shooter_id}', '{shot_type}', '{shot_score}')""".format(
         game_id=game_id,
         shooter_id=shooter_id,
         dt=dt,
@@ -159,13 +163,13 @@ def register_shot(game_id: str, shot_type: str, shot_score: int, shooter_id: int
                         SET 
                         player_1_score = CASE 
                             WHEN 'shooter_id' = player_1_id 
-                            THEN player_1_score = player_1_score + '%{shot_score}%' 
+                            THEN player_1_score + {shot_score} 
                             ELSE player_1_score END,
                         player_2_score = CASE 
                             WHEN 'shooter_id' = player_2_id 
-                            THEN player_2_score = player_2_score + '%{shot_score}%'
-                            ELSE player_2_score END,	
-                        WHERE game_id = '%{game_id}%'""".format(
+                            THEN player_2_score + {shot_score}
+                            ELSE player_2_score END	
+                        WHERE game_id = '{game_id}'""".format(
         shot_score=shot_score,
         game_id=game_id
     )
@@ -182,7 +186,7 @@ def switch_shooter(game_id: str) -> None:
     query = """ UPDATE live_games 
                 SET 
                 shooter_id = CASE WHEN shooter_id = player_1_id THEN player_2_id ELSE player_1_id END 
-                WHERE game_id = '%{game_id}%'""".format(game_id=game_id)
+                WHERE game_id = '{game_id}'""".format(game_id=game_id)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
     cursor.execute(query)
@@ -191,23 +195,22 @@ def switch_shooter(game_id: str) -> None:
     return
 
 
-def check_endgame(game_id: str) -> bool:
+def check_endgame(game_id: str) -> int:
     """Функция, которая проверяет, закончилась ли игра."""
-    query = """ SELECT
-                CASE WHEN player_1_score = 8 OR player_2_score = 8 THEN TRUE ELSE FALSE END 
+    query = """ SELECT GREATEST(player_1_score, player_2_score) 
                 FROM live_games lg 
-                WHERE game_id = '%{game_id}%'"""
+                WHERE game_id = '{game_id}' """.format(game_id=game_id)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
     cursor.execute(query)
-    game_ended = cursor.fetchall()
+    highest_score = cursor.fetchone()
     cursor.close()
-    return bool(*game_ended[0])
+    return int(highest_score)
 
 def remove_live_game(game_id: str) -> None:
     """Функция стирает строку из таблицы live_games когда игра заканчивается."""
     query = """ DELETE FROM live_games
-                WHERE game_id = '%{game_id}%'""".format(game_id=game_id)
+                WHERE game_id = '{game_id}'""".format(game_id=game_id)
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
     cursor.execute(query)
