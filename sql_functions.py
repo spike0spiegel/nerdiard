@@ -162,16 +162,17 @@ def register_shot(game_id: str, shot_type: str, shot_score: int, shooter_id: str
     query_update = f"""  UPDATE live_games
                         SET 
                         player_1_score = CASE 
-                            WHEN 'shooter_id' = player_1_id 
+                            WHEN player_1_id = '{shooter_id}' 
                             THEN player_1_score + {shot_score} 
                             ELSE player_1_score END,
                         player_2_score = CASE 
-                            WHEN 'shooter_id' = player_2_id 
+                            WHEN player_2_id  = '{shooter_id}'
                             THEN player_2_score + {shot_score}
                             ELSE player_2_score END	
                         WHERE game_id = '{game_id}'""".format(
         shot_score=shot_score,
-        game_id=game_id
+        game_id=game_id,
+        shooter_id=shooter_id
     )
     cursor = conn.cursor()
     cursor.execute('SET search_path TO nerdiard')
@@ -205,7 +206,7 @@ def check_endgame(game_id: str) -> int:
     cursor.execute(query)
     highest_score = cursor.fetchone()
     cursor.close()
-    return int(highest_score)
+    return highest_score[0]
 
 def remove_live_game(game_id: str) -> None:
     """Функция стирает строку из таблицы live_games когда игра заканчивается."""

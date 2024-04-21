@@ -100,7 +100,7 @@ def register_shot(call):
     register_shot(game_id, shot_type, shot_score, shooter_id)
     bot.send_message(call.message.chat.id, f"Удар был записан.")
 
-    if shot_score == '0':
+    if shot_score == 0:
         switch_shooter(game_id)
     print(game_id)
     print(check_endgame(game_id))
